@@ -35,7 +35,8 @@ app.use("/api/tracks", trackRoutes);
 app.use("/api/entries", entryRoutes);
 
 // Error handling middleware
-app.use(errorHandler);
 app.use(notFound);
+app.use(errorHandler);
+
 
 export default app;
