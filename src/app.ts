@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/authRoutes";
 import trackRoutes from "./routes/trackRoutes";
 import entryRoutes from "./routes/entryRoutes";
+import { requestLogger } from "./middleware/requestLogger";
 import { errorHandler, notFound } from "./middleware/errorHandler";
 
 const app: Application = express();
@@ -25,7 +26,11 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+app.use(requestLogger);
 
+app.get("/health", (req, res) => {
+  res.sendStatus(200);
+})
 app.get("/", (req, res) => {
     res.send({ message: "Trackr API is running"});
 });

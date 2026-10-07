@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/AppError';
+import { logger } from '../utils/logger';
 
 export const errorHandler = (
   err: Error,
@@ -7,17 +8,45 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  console.error(err);
-
   if (err instanceof AppError) {
-    return res.status(err.statusCode).json({ message: err.message });
+    logger.warn('handled error', {
+      message: err.message,
+      statusCode: err.statusCode,
+      code: err.code,
+      path: req.originalUrl,
+      method: req.method,
+    });
+
+    return res.status(err.statusCode).json({
+      success: false,
+      error: {
+        message: err.message,
+        code: err.code,
+      },
+    });
   }
 
-  // anything unexpected falls back to a generic 500
-  res.status(500).json({ message: 'Something went wrong' });
+  // anything unexpected is a genuine bug — log it loudly, full stack trace
+  logger.error('unhandled error', {
+    message: err.message,
+    stack: err.stack,
+    path: req.originalUrl,
+    method: req.method,
+  });
+
+  res.status(500).json({
+    success: false,
+    error: {
+      message: 'Something went wrong',
+    },
+  });
 };
 
-// catches requests to routes that don't exist at all
 export const notFound = (req: Request, res: Response, next: NextFunction) => {
-  res.status(404).json({ message: `Route not found: ${req.originalUrl}` });
+  res.status(404).json({
+    success: false,
+    error: {
+      message: `Route not found: ${req.originalUrl}`,
+    },
+  });
 };

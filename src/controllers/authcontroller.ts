@@ -13,25 +13,18 @@ export const signup = async (req: Request, res: Response, next: NextFunction) =>
     }
 
     const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      throw new AppError("Email already in use", 409);
-    }
-
+    if (existingUser) throw new AppError("Email already in use", 409);
+  
     const hashedPassword = await hashPassword(password);
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-    });
+    const user = await User.create({name, email, password: hashedPassword,});
 
-    const token = generateToken(user._id.toString(), user.role);
+    res.status(200).json({
+      message: "Account created successfully",
+      user:{id:user._id, name:user.name, email:user.email}
+    })
 
-    res.status(201).json({
-      token,
-      user: { id: user._id, name: user.name, email: user.email },
-    });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };
 
@@ -59,7 +52,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       token,
       user: { id: user._id, name: user.name, email: user.email },
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    next(err);
   }
 };

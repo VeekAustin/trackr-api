@@ -1,26 +1,19 @@
 import { NextFunction, Request, Response } from 'express';
-import { Track } from '../models/Track';
+import { Track, ITrack } from '../models/Track';
 import { Entry } from '../models/Entry';
 import { AppError } from '../utils/AppError';
+import { findOrFail, assertOwnership, isDuplicateKeyError } from '../utils/controllerHelpers';
 
 export const createTrack = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, color } = req.body;
+    if (!name) throw new AppError('name is required', 400);
 
-    if (!name) {
-      throw new AppError('name is required', 400);
-    }
-
-    const track = await Track.create({
-      user: req.userId,
-      name,
-      color,
-    });
-
+    const track = await Track.create({user: req.userId, name, color});
     res.status(201).json(track);
-  } catch (error: any) {
-    if (error.code === 11000) {
-      throw new AppError('You already have a track with that name', 409);
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      return next (new AppError('You already have a track with that name', 409));
     }
     next(error);
   }
@@ -37,18 +30,10 @@ export const getTracks = async (req: Request, res: Response, next: NextFunction)
 
 export const deleteTrack = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
+    const track = await findOrFail<ITrack>(Track, id, 'Track');
+    assertOwnership(track.user, req.userId!, 'track');
 
-    const track = await Track.findById(id);
-    if (!track) {
-      throw new AppError('Track not found', 404);
-    }
-
-    if (track.user.toString() !== req.userId) {
-      throw new AppError('Not authorized to delete this track', 403);
-    }
-
-    // cascade: remove every entry that belongs to this track
     await Entry.deleteMany({ track: track._id });
     await track.deleteOne();
 
