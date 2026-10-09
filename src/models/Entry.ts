@@ -39,5 +39,5 @@ const entrySchema = new Schema<IEntry>({
     default: Date.now,
   },
 });
-
+entrySchema.index({ user: 1, createdAt: -1, _id: -1 });
 export const Entry = mongoose.model<IEntry>('Entry', entrySchema);

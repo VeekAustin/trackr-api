@@ -17,6 +17,12 @@ export const protect = (req: Request, res: Response, next: NextFunction) => {
         }
 
         const token = authHeader.split(" ")[1];
+        if (!token) {
+            return res.status(401).json({
+                message: "Not authorized, no token"
+            });
+        }
+        
         const secret = process.env.JWT_SECRET;
 
         if (!secret) {
