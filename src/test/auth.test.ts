@@ -11,7 +11,8 @@ describe('Auth routes', () => {
     });
 
     expect(res.status).toBe(201);
-    expect(res.body.token).toBeDefined();
+    expect(res.body.message).toBe('Account created successfully');
+    expect(res.body.token).toBeUndefined();
     expect(res.body.user.email).toBe('test@example.com');
     expect(res.body.user.password).toBeUndefined(); // password must never be returned
   });
@@ -53,7 +54,8 @@ describe('Auth routes', () => {
       password: 'password123',
     });
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('Login successful');
   });
 
   it('rejects login with wrong password', async () => {

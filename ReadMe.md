@@ -82,7 +82,7 @@ All routes are prefixed with `/api`.
 
 | Method | Route | Body | Notes |
 |---|---|---|---|
-| POST | `/auth/signup` | `{ name, email, password }` | Returns `{ token, user }` |
+| POST | `/auth/signup` | `{ name, email, password }` | Returns `{ message, user }` |
 | POST | `/auth/login` | `{ email, password }` | Returns `{ token, user }` |
 
 ### Tracks — requires `Authorization: Bearer <token>`
@@ -102,7 +102,7 @@ All routes are prefixed with `/api`.
 | DELETE | `/entries/:id` | — | Must belong to the caller |
 
 ## Design decision
-Ownership checks and not-found lookups are centralized in `util/controllerHelpers.ts` rather than repeated per controller, so every resource-scoped route enforces the same rule.
+Ownership checks and not-found lookups are centralized in `utils/controllerHelpers.ts` rather than repeated per controller, so every resource-scoped route enforces the same rule.
 
 ## Testing
 

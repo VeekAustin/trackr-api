@@ -3,11 +3,17 @@ import request from 'supertest';
 import app from '../app';
 
 async function createUserAndGetToken() {
-  const res = await request(app).post('/api/auth/signup').send({
-    name: 'Track Tester',
-    email: `tracktester${Date.now()}@example.com`,
-    password: 'password123',
-  });
+  const email = `tracktester${Date.now()}${Math.random()}@example.com`;
+  const password = 'password123';
+
+  await request(app)
+    .post('/api/auth/signup')
+    .send({ name: 'Track Tester', email, password });
+
+  const res = await request(app)
+    .post('/api/auth/login')
+    .send({ email, password });
+
   return res.body.token as string;
 }
 
