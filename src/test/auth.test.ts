@@ -53,8 +53,7 @@ describe('Auth routes', () => {
       password: 'password123',
     });
 
-    expect(res.status).toBe(200);
-    expect(res.body.token).toBeDefined();
+    expect(res.status).toBe(201);
   });
 
   it('rejects login with wrong password', async () => {

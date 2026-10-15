@@ -16,13 +16,13 @@ export const signup = async (req: Request, res: Response, next: NextFunction) =>
     if (existingUser) throw new AppError("Email already in use", 409);
   
     const hashedPassword = await hashPassword(password);
-    const user = await User.create({name, email, password: hashedPassword,});
+    const user = await User.create({ name, email, password: hashedPassword });
 
-    res.status(200).json({
+    res.status(201).json({
       message: "Account created successfully",
-      user:{id:user._id, name:user.name, email:user.email}
-    })
-
+      user: { id: user._id, name: user.name, email: user.email },
+    });
+    
   } catch (err) {
     next(err);
   }
