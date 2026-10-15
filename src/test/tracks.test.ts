@@ -90,7 +90,7 @@ describe('Track routes', () => {
       .get('/api/entries')
       .set('Authorization', `Bearer ${token}`);
 
-    expect(entriesRes.body).toHaveLength(0);
+    expect(entriesRes.body.data).toHaveLength(0);
   });
 
   it('prevents a user from deleting another user\'s track', async () => {
