@@ -8,8 +8,8 @@ export interface IUser extends Document {
   email: string;
   role: Role;
   createdAt: Date;
-  passwordResetToken: String;
-  passwordResetExpires:  Date;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
 }
 
 const userSchema = new Schema<IUser>({
