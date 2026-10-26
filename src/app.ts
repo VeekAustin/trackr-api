@@ -8,6 +8,7 @@ import { requestLogger } from "./middleware/requestLogger";
 import { errorHandler, notFound } from "./middleware/errorHandler";
 
 const app: Application = express();
+app.set("trust proxy", 1);
 
 const allowedOrigins = [
   "http://localhost:3000",

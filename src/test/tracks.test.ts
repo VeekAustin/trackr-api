@@ -1,110 +1,153 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import request from 'supertest';
-import app from '../app';
+import { describe, it, expect, beforeEach } from "vitest";
+import request from "supertest";
+import app from "../app";
 
 async function createUserAndGetToken() {
   const email = `tracktester${Date.now()}${Math.random()}@example.com`;
-  const password = 'password123';
+  const password = "password123";
 
   await request(app)
-    .post('/api/auth/signup')
-    .send({ name: 'Track Tester', email, password });
+    .post("/api/auth/signup")
+    .send({ name: "Track Tester", email, password });
 
   const res = await request(app)
-    .post('/api/auth/login')
+    .post("/api/auth/login")
     .send({ email, password });
 
   return res.body.token as string;
 }
 
-describe('Track routes', () => {
-  it('rejects requests with no token', async () => {
-    const res = await request(app).get('/api/tracks');
+describe("Track routes", () => {
+  it("rejects requests with no token", async () => {
+    const res = await request(app).get("/api/tracks");
     expect(res.status).toBe(401);
   });
 
-  it('creates a track for the authenticated user', async () => {
+  it("creates a track for the authenticated user", async () => {
     const token = await createUserAndGetToken();
 
     const res = await request(app)
-      .post('/api/tracks')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: 'dev', color: '#4d9de0' });
+      .post("/api/tracks")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ name: "dev", color: "#4d9de0" });
 
     expect(res.status).toBe(201);
-    expect(res.body.name).toBe('dev');
+    expect(res.body.name).toBe("dev");
   });
 
-  it('only returns tracks belonging to the requesting user', async () => {
+  it("only returns tracks belonging to the requesting user", async () => {
     const tokenA = await createUserAndGetToken();
     const tokenB = await createUserAndGetToken();
 
     await request(app)
-      .post('/api/tracks')
-      .set('Authorization', `Bearer ${tokenA}`)
-      .send({ name: 'userA-track', color: '#000000' });
+      .post("/api/tracks")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ name: "userA-track", color: "#000000" });
 
     const res = await request(app)
-      .get('/api/tracks')
-      .set('Authorization', `Bearer ${tokenB}`);
+      .get("/api/tracks")
+      .set("Authorization", `Bearer ${tokenB}`);
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(0); // user B sees none of user A's tracks
   });
 
-  it('rejects duplicate track names for the same user', async () => {
+  it("rejects duplicate track names for the same user", async () => {
     const token = await createUserAndGetToken();
 
     await request(app)
-      .post('/api/tracks')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: 'dev', color: '#4d9de0' });
+      .post("/api/tracks")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ name: "dev", color: "#4d9de0" });
 
     const res = await request(app)
-      .post('/api/tracks')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: 'dev', color: '#000000' });
+      .post("/api/tracks")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ name: "dev", color: "#000000" });
 
     expect(res.status).toBe(409);
   });
 
-  it('deletes a track and cascades to its entries', async () => {
+  it("deletes a track and cascades to its entries", async () => {
     const token = await createUserAndGetToken();
 
     const trackRes = await request(app)
-      .post('/api/tracks')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: 'dev', color: '#4d9de0' });
+      .post("/api/tracks")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ name: "dev", color: "#4d9de0" });
     const trackId = trackRes.body._id;
 
     await request(app)
-      .post('/api/entries')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ track: trackId, title: 'Test entry', date: '2026-10-01' });
+      .post("/api/entries")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ track: trackId, title: "Test entry", date: "2026-10-01" });
 
     await request(app)
       .delete(`/api/tracks/${trackId}`)
-      .set('Authorization', `Bearer ${token}`);
+      .set("Authorization", `Bearer ${token}`);
 
     const entriesRes = await request(app)
-      .get('/api/entries')
-      .set('Authorization', `Bearer ${token}`);
+      .get("/api/entries")
+      .set("Authorization", `Bearer ${token}`);
 
     expect(entriesRes.body.data).toHaveLength(0);
   });
 
-  it('prevents a user from deleting another user\'s track', async () => {
+  it("paginates entries by date, including backfilled ones", async () => {
+    const token = await createUserAndGetToken();
+    const auth = { Authorization: `Bearer ${token}` };
+    const track = await request(app)
+      .post("/api/tracks")
+      .set(auth)
+      .send({ name: "paging", color: "#38bdf8" });
+
+    // Inserted out of date order, like a backfill
+    for (const date of ["2026-10-10", "2026-09-01", "2026-10-20"]) {
+      await request(app)
+        .post("/api/entries")
+        .set(auth)
+        .send({ track: track.body._id, title: `entry ${date}`, date });
+    }
+
+    const first = await request(app).get("/api/entries?limit=2").set(auth);
+    expect(first.status).toBe(200);
+    expect(first.body.data.map((e: { date: string }) => e.date)).toEqual([
+      "2026-10-20",
+      "2026-10-10",
+    ]);
+    expect(first.body.hasNextPage).toBe(true);
+
+    const second = await request(app)
+      .get(
+        `/api/entries?limit=2&cursor=${encodeURIComponent(first.body.nextCursor)}`,
+      )
+      .set(auth);
+    expect(second.body.data.map((e: { date: string }) => e.date)).toEqual([
+      "2026-09-01",
+    ]);
+    expect(second.body.nextCursor).toBeNull();
+  });
+
+  it("rejects an invalid cursor", async () => {
+    const token = await createUserAndGetToken();
+    const res = await request(app)
+      .get("/api/entries?cursor=garbage")
+      .set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(400);
+  });
+
+  it("prevents a user from deleting another user's track", async () => {
     const tokenA = await createUserAndGetToken();
     const tokenB = await createUserAndGetToken();
 
     const trackRes = await request(app)
-      .post('/api/tracks')
-      .set('Authorization', `Bearer ${tokenA}`)
-      .send({ name: 'userA-track', color: '#000000' });
+      .post("/api/tracks")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ name: "userA-track", color: "#000000" });
 
     const res = await request(app)
       .delete(`/api/tracks/${trackRes.body._id}`)
-      .set('Authorization', `Bearer ${tokenB}`);
+      .set("Authorization", `Bearer ${tokenB}`);
 
     expect(res.status).toBe(403);
   });
