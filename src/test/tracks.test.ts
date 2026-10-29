@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setCacheClient, CacheClient } from "../utils/cache";
 import { Track } from "../models/Track";
 import request from "supertest";
