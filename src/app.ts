@@ -36,6 +36,16 @@ app.get("/", (req, res) => {
     res.send({ message: "Trackr API is running"});
 });
 
+// Auth responses can contain tokens: never store them anywhere.
+app.use("/api/auth", (_req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
+// Per-user data: browsers keep a copy but must revalidate; shared caches must not store it.
+app.use(["/api/tracks", "/api/entries"], (_req, res, next) => {
+  res.set("Cache-Control", "private, no-cache");
+  next();
+});
 app.use("/api/auth", authRoutes);
 app.use("/api/tracks", trackRoutes);
 app.use("/api/entries", entryRoutes);

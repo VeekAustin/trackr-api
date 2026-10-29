@@ -3,6 +3,7 @@ import { Track, ITrack } from '../models/Track';
 import { Entry } from '../models/Entry';
 import { AppError } from '../utils/AppError';
 import { findOrFail, assertOwnership, isDuplicateKeyError } from '../utils/controllerHelpers';
+import { cacheDel, cacheGet, cacheKeys, cacheSet } from "../utils/cache";
 
 export const createTrack = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -10,6 +11,7 @@ export const createTrack = async (req: Request, res: Response, next: NextFunctio
     if (!name) throw new AppError('name is required', 400);
 
     const track = await Track.create({user: req.userId, name, color});
+    await cacheDel(cacheKeys.tracks(req.userId!));
     res.status(201).json(track);
   } catch (error) {
     if (isDuplicateKeyError(error)) {
@@ -21,8 +23,17 @@ export const createTrack = async (req: Request, res: Response, next: NextFunctio
 
 export const getTracks = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const key = cacheKeys.tracks(req.userId!);
+
+    const cached = await cacheGet<unknown[]>(key);
+    if (cached !== null) {
+      res.set("X-Cache", "HIT").status(200).json(cached);
+      return;
+    }
+
     const tracks = await Track.find({ user: req.userId }).sort({ createdAt: 1 });
-    res.status(200).json(tracks);
+    await cacheSet(key, tracks);
+    res.set("X-Cache", "MISS").status(200).json(tracks);
   } catch (error) {
     next(error);
   }
@@ -36,7 +47,7 @@ export const deleteTrack = async (req: Request, res: Response, next: NextFunctio
 
     await Entry.deleteMany({ track: track._id });
     await track.deleteOne();
-
+    await cacheDel(cacheKeys.tracks(req.userId!));
     res.status(200).json({ message: 'Track and its entries deleted' });
   } catch (error) {
     next(error);

@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { setCacheClient, CacheClient } from "../utils/cache";
+import { Track } from "../models/Track";
 import request from "supertest";
 import app from "../app";
 
@@ -150,5 +152,58 @@ describe("Track routes", () => {
       .set("Authorization", `Bearer ${tokenB}`);
 
     expect(res.status).toBe(403);
+  });
+});
+
+function createFakeCache(): CacheClient {
+  const store = new Map<string, string>();
+  return {
+    async get(key) { return store.get(key) ?? null; },
+    async set(key, value) { store.set(key, value); return "OK"; },
+    async del(key) { return store.delete(key) ? 1 : 0; },
+  };
+}
+
+describe("Track caching", () => {
+  beforeEach(() => setCacheClient(createFakeCache()));
+  afterEach(() => {
+    setCacheClient(null);
+    vi.restoreAllMocks();
+  });
+
+  it("serves repeat reads from the cache and clears it on write", async () => {
+    const auth = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    const findSpy = vi.spyOn(Track, "find");
+
+    const first = await request(app).get("/api/tracks").set(auth);
+    const second = await request(app).get("/api/tracks").set(auth);
+    expect(first.headers["x-cache"]).toBe("MISS");
+    expect(second.headers["x-cache"]).toBe("HIT");
+    expect(findSpy).toHaveBeenCalledTimes(1);
+    expect(second.body).toEqual(first.body);
+
+    await request(app).post("/api/tracks").set(auth).send({ name: "fresh", color: "#38bdf8" });
+    const third = await request(app).get("/api/tracks").set(auth);
+    expect(third.headers["x-cache"]).toBe("MISS");
+    expect(third.body.map((t: { name: string }) => t.name)).toContain("fresh");
+  });
+
+  it("never shows one user's cached tracks to another user", async () => {
+    const a = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    const b = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    await request(app).post("/api/tracks").set(a).send({ name: "mine", color: "#38bdf8" });
+    await request(app).get("/api/tracks").set(a);
+
+    const res = await request(app).get("/api/tracks").set(b);
+    expect(res.body).toEqual([]);
+  });
+
+  it("still answers when the cache is down", async () => {
+    const down = async () => { throw new Error("cache down"); };
+    setCacheClient({ get: down, set: down, del: down });
+
+    const auth = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    const res = await request(app).get("/api/tracks").set(auth);
+    expect(res.status).toBe(200);
   });
 });
