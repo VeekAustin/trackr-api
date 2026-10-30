@@ -10,7 +10,10 @@ const DEFAULT_TTL_SECONDS = 60;
 
 function createClientFromEnv(): CacheClient | null {
   const url = process.env.REDIS_URL;
-  if (!url) return null; // caching is optional: no URL means no cache
+  if (!url) {
+    console.log("[cache] REDIS_URL not set, caching is off");
+    return null;
+  } 
 
   const redis = new Redis(url, {
     enableOfflineQueue: false, // fail fast when Redis is unreachable instead of queueing
@@ -18,6 +21,7 @@ function createClientFromEnv(): CacheClient | null {
     connectTimeout: 5000,
     commandTimeout: 1000, // never let a hung cache stall a request
   });
+  redis.on("ready", () => console.log("[cache] Redis connected"));
   redis.on("error", (err) => console.error("[cache] Redis error:", err.message));
   return redis;
 }
