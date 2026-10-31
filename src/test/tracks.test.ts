@@ -207,3 +207,83 @@ describe("Track caching", () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe("Entry stats", () => {
+  it("counts entries, streaks and heatmap days for the requesting user only", async () => {
+    const auth = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    const other = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+
+    const track = (await request(app).post("/api/tracks").set(auth)
+      .send({ name: "stats", color: "#38bdf8" })).body._id;
+    const otherTrack = (await request(app).post("/api/tracks").set(other)
+      .send({ name: "theirs", color: "#38bdf8" })).body._id;
+
+    for (const date of ["2026-10-18", "2026-10-19", "2026-10-20", "2026-10-20", "2026-06-01"]) {
+      await request(app).post("/api/entries").set(auth)
+        .send({ track, title: `entry ${date}`, date });
+    }
+    await request(app).post("/api/entries").set(other)
+      .send({ track: otherTrack, title: "not mine", date: "2026-10-20" });
+
+    const res = await request(app).get("/api/entries/stats?today=2026-10-20").set(auth);
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(5);
+    expect(res.body.activeDays).toBe(4);
+    expect(res.body.currentStreak).toBe(3);
+    expect(res.body.longestStreak).toBe(3);
+    expect(res.body.heatmap).toEqual([
+      { date: "2026-10-18", count: 1 },
+      { date: "2026-10-19", count: 1 },
+      { date: "2026-10-20", count: 2 },
+    ]);
+  });
+
+  it("falls back to the server's date when the query value is invalid", async () => {
+    const auth = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    const res = await request(app).get("/api/entries/stats?today=garbage").set(auth);
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(0);
+  });
+});
+
+describe("Entry track ownership", () => {
+  it("lets a user log an entry on their own track", async () => {
+    const auth = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    const track = (await request(app).post("/api/tracks").set(auth)
+      .send({ name: "mine", color: "#38bdf8" })).body._id;
+
+    const res = await request(app).post("/api/entries").set(auth)
+      .send({ track, title: "ok", date: "2026-10-20" });
+    expect(res.status).toBe(201);
+  });
+
+  it("rejects an entry on another user's track", async () => {
+    const owner = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    const intruder = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    const track = (await request(app).post("/api/tracks").set(owner)
+      .send({ name: "private", color: "#38bdf8" })).body._id;
+
+    const res = await request(app).post("/api/entries").set(intruder)
+      .send({ track, title: "sneaky", date: "2026-10-20" });
+    expect(res.status).toBe(403);
+
+    const entries = await request(app).get("/api/entries").set(owner);
+    expect(entries.body.data).toHaveLength(0);
+  });
+
+  it("rejects a track that does not exist", async () => {
+    const auth = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    const res = await request(app).post("/api/entries").set(auth)
+      .send({ track: "507f1f77bcf86cd799439011", title: "ghost", date: "2026-10-20" });
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects malformed track ids, including query operators", async () => {
+    const auth = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    for (const track of ["garbage", { $ne: null }]) {
+      const res = await request(app).post("/api/entries").set(auth)
+        .send({ track, title: "bad", date: "2026-10-20" });
+      expect(res.status).toBe(400);
+    }
+  });
+});
