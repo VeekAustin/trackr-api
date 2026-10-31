@@ -11,6 +11,7 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
       path: req.originalUrl,
       status: res.statusCode,
       durationMs: duration,
+      cache: res.getHeader("X-Cache") ?? undefined,
     });
   });
 
