@@ -3,7 +3,7 @@ import { Entry, IEntry } from "../models/Entry";
 import { AppError } from "../utils/AppError";
 import { assertOwnership, findOrFail } from "../utils/controllerHelpers";
 import mongoose from "mongoose";
-import { computeStreaks, isDateString, shiftDate } from "../utils/stats";
+import { computeStreaks, isDateString, shiftDate, buildStats } from "../utils/stats";
 import { Track, ITrack } from "../models/Track";
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -116,39 +116,29 @@ export const deleteEntry = async (
 
 const HEATMAP_DAYS = 90;
 
-export const getEntryStats = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
+export const getEntryStats = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // The client sends its own calendar day so streaks follow the user's timezone.
     const today = isDateString(req.query.today)
       ? req.query.today
       : new Date().toISOString().slice(0, 10);
 
-    // One row per active day. Aggregation pipelines don't cast ids, so convert explicitly.
-    const perDay = await Entry.aggregate<{ _id: string; count: number }>([
+    // One row per (day, track). Aggregation pipelines don't cast ids, so convert explicitly.
+    const grouped = await Entry.aggregate<{
+      _id: { date: string; track: mongoose.Types.ObjectId };
+      count: number;
+    }>([
       { $match: { user: new mongoose.Types.ObjectId(req.userId) } },
-      { $group: { _id: "$date", count: { $sum: 1 } } },
-      { $sort: { _id: 1 } },
+      { $group: { _id: { date: "$date", track: "$track" }, count: { $sum: 1 } } },
     ]);
 
-    const windowStart = shiftDate(today, -(HEATMAP_DAYS - 1));
-    const activeDates = perDay
-      .map((day) => day._id)
-      .filter((date) => date <= today);
-    const { currentStreak, longestStreak } = computeStreaks(activeDates, today);
+    const rows = grouped.map((row) => ({
+      date: row._id.date,
+      track: row._id.track.toString(),
+      count: row.count,
+    }));
 
-    res.status(200).json({
-      total: perDay.reduce((sum, day) => sum + day.count, 0),
-      activeDays: activeDates.length,
-      currentStreak,
-      longestStreak,
-      heatmap: perDay
-        .filter((day) => day._id >= windowStart && day._id <= today)
-        .map((day) => ({ date: day._id, count: day.count })),
-    });
+    res.status(200).json(buildStats(rows, today));
   } catch (error) {
     next(error);
   }

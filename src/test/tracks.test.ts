@@ -231,6 +231,11 @@ describe("Entry stats", () => {
     expect(res.body.activeDays).toBe(4);
     expect(res.body.currentStreak).toBe(3);
     expect(res.body.longestStreak).toBe(3);
+    expect(res.body.weeks[0].total).toBe(3);
+    expect(res.body.weeks[0].byTrack).toEqual([{ track, count: 3 }]);
+    expect(res.body.weeks[1].total).toBe(1);
+    expect(res.body.months[0].total).toBe(4);
+    expect(res.body.months[4].total).toBe(1); // June
     expect(res.body.heatmap).toEqual([
       { date: "2026-10-18", count: 1 },
       { date: "2026-10-19", count: 1 },
