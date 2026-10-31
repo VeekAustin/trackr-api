@@ -28,6 +28,18 @@ describe("isDateString", () => {
     expect(isDateString("garbage")).toBe(false);
     expect(isDateString(undefined)).toBe(false);
   });
+
+  it("rejects days that do not exist in that month", () => {
+    expect(isDateString("2026-02-31")).toBe(false);
+    expect(isDateString("2026-04-31")).toBe(false);
+    expect(isDateString("2026-00-10")).toBe(false);
+    expect(isDateString("2026-10-00")).toBe(false);
+  });
+
+  it("knows which years have a February 29", () => {
+    expect(isDateString("2028-02-29")).toBe(true);
+    expect(isDateString("2027-02-29")).toBe(false);
+  });
 });
 
 describe("weekStart", () => {

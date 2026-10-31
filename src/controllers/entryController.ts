@@ -3,10 +3,13 @@ import { Entry, IEntry } from "../models/Entry";
 import { AppError } from "../utils/AppError";
 import { assertOwnership, findOrFail } from "../utils/controllerHelpers";
 import mongoose from "mongoose";
-import { computeStreaks, isDateString, shiftDate, buildStats } from "../utils/stats";
+import {
+  computeStreaks,
+  isDateString,
+  shiftDate,
+  buildStats,
+} from "../utils/stats";
 import { Track, ITrack } from "../models/Track";
-
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export const createEntry = async (
   req: Request,
@@ -19,8 +22,8 @@ export const createEntry = async (
     if (!track || !title || !date) {
       throw new AppError("track, title, and date are required", 400);
     }
-    if (typeof date !== "string" || !DATE_PATTERN.test(date)) {
-      throw new AppError("date must be in YYYY-MM-DD format", 400);
+    if (!isDateString(date)) {
+      throw new AppError("date must be a real date in YYYY-MM-DD format", 400);
     }
 
     if (typeof track !== "string" || !mongoose.isValidObjectId(track)) {
@@ -64,11 +67,7 @@ export const getEntries = async (
       // Cursor format: "<date>_<entryId>", matching the sort order (date desc, _id desc)
       const [cursorDate, id] = cursor.split("_");
 
-      if (
-        !cursorDate ||
-        !DATE_PATTERN.test(cursorDate) ||
-        !mongoose.isValidObjectId(id)
-      ) {
+      if (!isDateString(cursorDate) || !mongoose.isValidObjectId(id)) {
         throw new AppError("Invalid cursor", 400);
       }
 
@@ -116,7 +115,11 @@ export const deleteEntry = async (
 
 const HEATMAP_DAYS = 90;
 
-export const getEntryStats = async (req: Request, res: Response, next: NextFunction) => {
+export const getEntryStats = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     // The client sends its own calendar day so streaks follow the user's timezone.
     const today = isDateString(req.query.today)
@@ -129,7 +132,9 @@ export const getEntryStats = async (req: Request, res: Response, next: NextFunct
       count: number;
     }>([
       { $match: { user: new mongoose.Types.ObjectId(req.userId) } },
-      { $group: { _id: { date: "$date", track: "$track" }, count: { $sum: 1 } } },
+      {
+        $group: { _id: { date: "$date", track: "$track" }, count: { $sum: 1 } },
+      },
     ]);
 
     const rows = grouped.map((row) => ({

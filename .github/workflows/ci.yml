@@ -18,10 +18,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
+
+      # Same command Render runs, so a type error fails here before it blocks a deploy.
+      - name: Build
+        run: npm run build
 
       - name: Cache MongoDB binary
         uses: actions/cache@v4
@@ -33,6 +37,3 @@ jobs:
         run: npm test
         env:
           JWT_SECRET: test-secret-for-ci
-
-      - name: Build
-        run: npm run build

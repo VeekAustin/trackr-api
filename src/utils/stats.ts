@@ -4,13 +4,15 @@ export const HEATMAP_DAYS = 90;
 export const WEEKS_SHOWN = 8;
 export const MONTHS_SHOWN = 6;
 
-/** True for a real calendar date written as YYYY-MM-DD. */
+/**
+ * True for a real calendar date written as YYYY-MM-DD.
+ * The round trip matters: Date silently rolls "2026-02-31" over to March 3,
+ * so only a date that comes back unchanged is a real one.
+ */
 export function isDateString(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    DATE_PATTERN.test(value) &&
-    !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
-  );
+  if (typeof value !== "string" || !DATE_PATTERN.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 /** Add (or subtract) whole days from a YYYY-MM-DD string. Uses UTC so DST never shifts the result. */
