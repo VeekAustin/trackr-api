@@ -292,3 +292,34 @@ describe("Entry track ownership", () => {
     }
   });
 });
+
+describe("Entries filtered by track", () => {
+  it("returns only that track's entries and still paginates", async () => {
+    const auth = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    const makeTrack = async (name: string) =>
+      (await request(app).post("/api/tracks").set(auth)
+        .send({ name, color: "#38bdf8" })).body._id as string;
+    const a = await makeTrack("alpha");
+    const b = await makeTrack("beta");
+
+    for (const [track, date] of [[a, "2026-10-01"], [b, "2026-10-02"], [a, "2026-10-03"], [a, "2026-10-04"]]) {
+      await request(app).post("/api/entries").set(auth).send({ track, title: `on ${date}`, date });
+    }
+
+    const first = await request(app).get(`/api/entries?track=${a}&limit=2`).set(auth);
+    expect(first.body.data.map((e: { date: string }) => e.date)).toEqual(["2026-10-04", "2026-10-03"]);
+    expect(first.body.hasNextPage).toBe(true);
+
+    const second = await request(app)
+      .get(`/api/entries?track=${a}&limit=2&cursor=${encodeURIComponent(first.body.nextCursor)}`)
+      .set(auth);
+    expect(second.body.data.map((e: { date: string }) => e.date)).toEqual(["2026-10-01"]);
+    expect(second.body.hasNextPage).toBe(false);
+  });
+
+  it("rejects a malformed track filter", async () => {
+    const auth = { Authorization: `Bearer ${await createUserAndGetToken()}` };
+    const res = await request(app).get("/api/entries?track=garbage").set(auth);
+    expect(res.status).toBe(400);
+  });
+});

@@ -63,6 +63,15 @@ export const getEntries = async (
 
     const query: Record<string, unknown> = { user: req.userId };
 
+    // Optional filter: only this track's entries. Pagination keeps working with it.
+    if (req.query.track !== undefined) {
+      const track = req.query.track;
+      if (typeof track !== "string" || !mongoose.isValidObjectId(track)) {
+        throw new AppError("Invalid track id", 400);
+      }
+      query.track = track;
+    }
+
     if (cursor) {
       // Cursor format: "<date>_<entryId>", matching the sort order (date desc, _id desc)
       const [cursorDate, id] = cursor.split("_");
