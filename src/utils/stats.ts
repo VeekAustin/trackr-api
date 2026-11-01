@@ -114,10 +114,12 @@ export function buildBreakdown(rows: StatRow[], today: string) {
 /** Everything the dashboard needs, from one row per (date, track). */
 export function buildStats(rows: StatRow[], today: string) {
   const perDay = new Map<string, number>();
+  const perTrack = new Map<string, number>();
   let total = 0;
   for (const row of rows) {
     total += row.count;
     perDay.set(row.date, (perDay.get(row.date) ?? 0) + row.count);
+    perTrack.set(row.track, (perTrack.get(row.track) ?? 0) + row.count);
   }
 
   const activeDates = Array.from(perDay.keys()).filter((date) => date <= today);
@@ -134,6 +136,7 @@ export function buildStats(rows: StatRow[], today: string) {
     currentStreak,
     longestStreak,
     heatmap,
+    byTrack: Array.from(perTrack, ([track, count]) => ({ track, count })).sort((a, b) => b.count - a.count),
     ...buildBreakdown(rows, today),
   };
 }

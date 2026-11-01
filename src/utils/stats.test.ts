@@ -152,6 +152,10 @@ describe("buildStats", () => {
       { date: "2026-10-19", count: 1 },
       { date: "2026-10-20", count: 2 },
     ]);
+    expect(stats.byTrack).toEqual([
+      { track: "dev", count: 3 },
+      { track: "teach", count: 2 },
+    ]);
     expect(stats.weeks[0].total).toBe(3);
     expect(stats.months[0].total).toBe(4);
   });
